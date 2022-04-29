@@ -1,0 +1,312 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "In recent years, the range of funding options for projects created by individuals and\n",
+    "small companies has expanded considerably. In addition to savings, bank loans, friends\n",
+    "& family funding and other traditional options, crowdfunding has become a popular and\n",
+    "readily available alternative.\n",
+    "Kickstarter, founded in 2009, is one particularly well-known and popular crowdfunding\n",
+    "platform. It has an all-or-nothing funding model, whereby a project is only funded if it\n",
+    "meets its goal amount; otherwise no money is given by backers to a project.\n",
+    "A huge variety of factors contribute to the success or failure of a project — in general,\n",
+    "and also on Kickstarter. Some of these are able to be quantified or categorized, which\n",
+    "allows for the construction of a model to attempt to predict whether a project will\n",
+    "succeed or not. The aim of this project is to construct such a model and also to analyse\n",
+    "Kickstarter project data more generally, in order to help potential project creators\n",
+    "assess whether or not Kickstarter is a good funding option for them, and what their\n",
+    "chances of success are."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import glob\n",
+    "import re\n",
+    "\n",
+    "import warnings\n",
+    "warnings.filterwarnings('ignore')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Import and concatenate the data\n",
+    "df = pd.concat(map(pd.read_csv, glob.glob('data/data-2/*.csv')))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df.isnull().sum()\n",
+    "# A total of five columns include almost no data and are therefore excluded (friends, is_backing, is_starred, permission)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Drop features which will not be needed for further analysis\n",
+    "dropped_features = ['blurb', 'currency_symbol', 'id', 'backers_count', 'is_backing', 'permissions', 'is_starred', 'urls', 'source_url',\n",
+    "                    'slug', 'name', 'static_usd_rate', 'profile', 'friends', 'spotlight', 'is_starrable', 'photo', 'pledged', 'usd_type',\n",
+    "                    'fx_rate', 'location', 'creator', 'currency_trailing_code','current_currency', 'created_at']\n",
+    "df_cl = df.drop(dropped_features, axis=1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "df_cl['state'].value_counts()\n",
+    "# Only a very limited amount of suspended projects (drop), canceled projects will be treated as though they failed"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Built array which contains live projects for later use \n",
+    "array_live = ['live']\n",
+    "live_projects = df_cl.loc[df_cl['state'].isin(array_live)]\n",
+    "\n",
+    "# Filter and concat. for target variable\n",
+    "array_notlive = ['successful', 'failed', 'canceled']\n",
+    "finished_projects = df_cl.loc[df_cl['state'].isin(array_notlive)]\n",
+    "finished_projects.replace('canceled','failed', inplace=True)\n",
+    "# Replace successful and failed entries\n",
+    "finished_projects.replace(['successful','failed'],[1,0], inplace=True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Extract the category of each project from the category dict column\n",
+    "\n",
+    "list = []\n",
+    "for i, j in finished_projects['category'].iteritems():\n",
+    "    try:\n",
+    "        found = re.search('slug\":\"(.+?)/', j).group(1)\n",
+    "        list.append(found)\n",
+    "    except AttributeError:\n",
+    "        pass\n",
+    "\n",
+    "list_2 = []\n",
+    "for i, j in enumerate(list):\n",
+    "    try:\n",
+    "        found = re.search('(.+?)\"', j).group(1)\n",
+    "        list_2.append(found)\n",
+    "    except AttributeError:\n",
+    "        pass\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 140,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Add the categories and delete the original cluttered categories\n",
+    "\n",
+    "finished_projects['categories'] = pd.Series(list_2)\n",
+    "finished_projects.drop('category', axis=1, inplace=True)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 144,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>converted_pledged_amount</th>\n",
+       "      <th>country</th>\n",
+       "      <th>currency</th>\n",
+       "      <th>deadline</th>\n",
+       "      <th>disable_communication</th>\n",
+       "      <th>goal</th>\n",
+       "      <th>launched_at</th>\n",
+       "      <th>staff_pick</th>\n",
+       "      <th>state</th>\n",
+       "      <th>state_changed_at</th>\n",
+       "      <th>usd_pledged</th>\n",
+       "      <th>categories</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>1950</td>\n",
+       "      <td>US</td>\n",
+       "      <td>USD</td>\n",
+       "      <td>1504976459</td>\n",
+       "      <td>False</td>\n",
+       "      <td>1000.0</td>\n",
+       "      <td>1502384459</td>\n",
+       "      <td>False</td>\n",
+       "      <td>1</td>\n",
+       "      <td>1504976459</td>\n",
+       "      <td>1950.000000</td>\n",
+       "      <td>photography</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>22404</td>\n",
+       "      <td>US</td>\n",
+       "      <td>USD</td>\n",
+       "      <td>1371013395</td>\n",
+       "      <td>False</td>\n",
+       "      <td>15000.0</td>\n",
+       "      <td>1368421395</td>\n",
+       "      <td>False</td>\n",
+       "      <td>1</td>\n",
+       "      <td>1371013395</td>\n",
+       "      <td>22404.000000</td>\n",
+       "      <td>fashion</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>165</td>\n",
+       "      <td>GB</td>\n",
+       "      <td>GBP</td>\n",
+       "      <td>1489425776</td>\n",
+       "      <td>False</td>\n",
+       "      <td>10000.0</td>\n",
+       "      <td>1484245376</td>\n",
+       "      <td>False</td>\n",
+       "      <td>0</td>\n",
+       "      <td>1489425776</td>\n",
+       "      <td>165.384934</td>\n",
+       "      <td>music</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>2820</td>\n",
+       "      <td>US</td>\n",
+       "      <td>USD</td>\n",
+       "      <td>1357763527</td>\n",
+       "      <td>False</td>\n",
+       "      <td>2800.0</td>\n",
+       "      <td>1355171527</td>\n",
+       "      <td>False</td>\n",
+       "      <td>1</td>\n",
+       "      <td>1357763527</td>\n",
+       "      <td>2820.000000</td>\n",
+       "      <td>photography</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>5</th>\n",
+       "      <td>3725</td>\n",
+       "      <td>US</td>\n",
+       "      <td>USD</td>\n",
+       "      <td>1430533546</td>\n",
+       "      <td>False</td>\n",
+       "      <td>3500.0</td>\n",
+       "      <td>1427941546</td>\n",
+       "      <td>False</td>\n",
+       "      <td>1</td>\n",
+       "      <td>1430533546</td>\n",
+       "      <td>3725.000000</td>\n",
+       "      <td>theater</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "   converted_pledged_amount country currency    deadline  \\\n",
+       "1                      1950      US      USD  1504976459   \n",
+       "2                     22404      US      USD  1371013395   \n",
+       "3                       165      GB      GBP  1489425776   \n",
+       "4                      2820      US      USD  1357763527   \n",
+       "5                      3725      US      USD  1430533546   \n",
+       "\n",
+       "   disable_communication     goal  launched_at  staff_pick  state  \\\n",
+       "1                  False   1000.0   1502384459       False      1   \n",
+       "2                  False  15000.0   1368421395       False      1   \n",
+       "3                  False  10000.0   1484245376       False      0   \n",
+       "4                  False   2800.0   1355171527       False      1   \n",
+       "5                  False   3500.0   1427941546       False      1   \n",
+       "\n",
+       "   state_changed_at   usd_pledged   categories  \n",
+       "1        1504976459   1950.000000  photography  \n",
+       "2        1371013395  22404.000000      fashion  \n",
+       "3        1489425776    165.384934        music  \n",
+       "4        1357763527   2820.000000  photography  \n",
+       "5        1430533546   3725.000000      theater  "
+      ]
+     },
+     "execution_count": 144,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "finished_projects.head()\n",
+    "# Categorical data includes country, currency, disable_communication, staff_pick, categories"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.9.8"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
