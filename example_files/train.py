@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from sklearn.experimental import enable_halving_search_cv
@@ -8,9 +9,20 @@ from sklearn.metrics import precision_score, f1_score, confusion_matrix
 import pickle
 import warnings
 warnings.filterwarnings('ignore')
+RSEED = 42069
 
-# import
-df=pd.read_csv(path)
+
+import glob
+import pandas as pd
+from functions_kickstarter import *
+import sys
+
+file_directory = str(sys.argv[1]) + '/*.csv'
+df = pd.concat(map(pd.read_csv, glob.glob(file_directory)))
+# Reset the indices
+df.reset_index(drop=True, inplace=True)
+
+feature_engineering(df)
 
 # Set x and y
 X = df.drop('state', axis = 1)
@@ -97,7 +109,10 @@ votingC = VotingClassifier(estimators=[ ('XGB',XGB_best), ("RandomForest",RFC_be
 # Fit train data to Voting Classifier
 votingC = votingC.fit(X_train, y_train)
 
+# Save csv file with X_test, y_test
+print("Saving test data from train-test split in the models folder")
+
 #saving the model
-print("Saving model in the model folder")
-filename = 'models/linear_regression_model.sav'
+print("Saving model in the models folder")
+filename = 'models/ensemble_model.sav'
 pickle.dump(reg, open(filename, 'wb'))
