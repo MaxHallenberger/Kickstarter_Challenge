@@ -1,5 +1,7 @@
+from time import sleep
 import pandas as pd
 import numpy as np
+from pyrsistent import freeze
 from sklearn.ensemble import RandomForestClassifier, VotingClassifier
 from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from sklearn.experimental import enable_halving_search_cv
@@ -7,22 +9,28 @@ from sklearn.model_selection import HalvingGridSearchCV
 from xgboost import XGBClassifier
 from sklearn.metrics import precision_score, f1_score, confusion_matrix
 import pickle
-import warnings
-warnings.filterwarnings('ignore')
-RSEED = 42069
-
-
 import glob
 import pandas as pd
 from functions_kickstarter import *
-import sys
 
-file_directory = str(sys.argv[1]) + '/*.csv'
+import warnings
+warnings.filterwarnings('ignore')
+
+
+#file_directory = str(sys.argv[1]) + '/*.csv'
+file_directory = str(input('please enter the folder name of your kickstarter data: ')) + '/*.csv'
+RSEED = int(input('Enter the random seed integer: '))
+
+print('Training might take a while, please be patient...')
+
 df = pd.concat(map(pd.read_csv, glob.glob(file_directory)))
 # Reset the indices
 df.reset_index(drop=True, inplace=True)
 
-feature_engineering(df)
+df = feature_engineering(df)
+
+print('The df shape is:', df.shape)
+sleep(5)
 
 # Set x and y
 X = df.drop('state', axis = 1)
@@ -41,9 +49,11 @@ XGB = XGBClassifier()
 max_depth = [1,2,4,8,10]
 min_child_weight = np.linspace(1, 10, 5, endpoint=True) 
 
-gamma = np.linspace(0.5, 5, 5, endpoint=True)
+gamma = np.linspace(0.5, 5, 5,endpoint=True)
 subsample = np.linspace(0.5, 1, 5, endpoint=True)
 colsample_bytree = np.linspace(0.5, 1, 5, endpoint=True)
+
+print('XGB training......')
 
 XGB_param_grid = {
         'min_child_weight': min_child_weight,
@@ -55,7 +65,7 @@ XGB_param_grid = {
 
 
 gsXGB = HalvingGridSearchCV(estimator = XGB, 
-                    param_grid = XGB_param_grid, cv=kfold, scoring="precision", n_jobs= 4, verbose = 1)
+                    param_grid = XGB_param_grid, cv=kfold, scoring="precision", n_jobs= 4, verbose = 0)
 
 gsXGB.fit(X_train,y_train)
 
@@ -65,20 +75,21 @@ print(XGB_best.get_params())
 # Best score
 gsXGB.best_score_
 
+print('Random Forest training......')
 # RFC Parameters tunning 
 RFC = RandomForestClassifier()
 
 # Number of trees in random forest
-n_estimators = [int(x) for x in np.linspace(start = 200, stop = 800, num = 2)]
+n_estimators = [200, 400, 600, 800]
 # Number of features to consider at every split
 max_features = ['auto', 'sqrt']
 # Maximum number of levels in tree
-max_depth = [int(x) for x in np.linspace(1, 20, num = 5)]
+max_depth = [1, 5, 20]
 max_depth.append(None)
 # Minimum number of samples required to split a node
-min_samples_split = [ 5, 10]
+min_samples_split = [5, 10]
 # Minimum number of samples required at each leaf node
-min_samples_leaf = [ 2, 4]
+min_samples_leaf = [2, 4]
 # Method of selecting samples for training each tree
 bootstrap = [True, False]
 
@@ -92,18 +103,13 @@ rf_param_grid = {"max_depth": max_depth,
               "criterion": ["gini"]}
               
 
-gsRFC = HalvingGridSearchCV(RFC,param_grid = rf_param_grid, cv=kfold, scoring="precision", n_jobs= 4, verbose = 1)
+gsRFC = HalvingGridSearchCV(RFC,param_grid = rf_param_grid, cv=kfold, scoring="precision", n_jobs= 4, verbose = 0)
 
 gsRFC.fit(X_train,y_train)
 
 RFC_best = gsRFC.best_estimator_
 
-print(RFC_best.get_params())
-
-
-# Best score
-gsRFC.best_score_
-
+print(('Voting classifier training......'))
 # Voting Classifier (soft voting) including the three best models after grid search
 votingC = VotingClassifier(estimators=[ ('XGB',XGB_best), ("RandomForest",RFC_best)], voting='soft', n_jobs=4)
 # Fit train data to Voting Classifier
@@ -114,5 +120,6 @@ print("Saving test data from train-test split in the models folder")
 
 #saving the model
 print("Saving model in the models folder")
+
 filename = 'models/ensemble_model.sav'
-pickle.dump(reg, open(filename, 'wb'))
+pickle.dump(votingC, open(filename, 'wb'))

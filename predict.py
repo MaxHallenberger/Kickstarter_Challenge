@@ -5,7 +5,7 @@ from sklearn.metrics import confusion_matrix, precision_score
 
 
 # load the model from disk
-loaded_model = pickle.load(open(model/ensemble_model, 'rb'))
+loaded_model = pickle.load(open('models/ensemble_model.sav', 'rb'))
 X_test = pd.read_csv(X_test_path)
 y_test = pd.read_csv(y_test_path)
 
